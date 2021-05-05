@@ -27,6 +27,7 @@ maintainer: lakuhtz@gmail.com
 copyright: Copyright (c) 2021 Kadena LLC.
 category: Data, System
 tested-with:
+    GHC==9.0.1
     GHC==8.10.4
     GHC==8.8.4
     GHC==8.6.5
