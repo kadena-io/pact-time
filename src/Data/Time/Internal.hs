@@ -95,19 +95,19 @@ newtype NominalDiffTime = NominalDiffTime { _microseconds :: Int64 }
 -- microseconds.
 --
 microseconds :: Iso' NominalDiffTime Int64
-microseconds = iso (\(NominalDiffTime m) -> m) NominalDiffTime
+microseconds = iso toMicroseconds fromMicroseconds
 {-# INLINE microseconds #-}
 
 -- | Convert from 'NominalDiffTime' to a 64-bit representation of microseconds.
 --
 toMicroseconds :: NominalDiffTime -> Int64
-toMicroseconds = view microseconds
+toMicroseconds = _microseconds
 {-# INLINE toMicroseconds #-}
 
 -- | Convert from a 64-bit representation of microseconds to 'NominalDiffTime'.
 --
 fromMicroseconds :: Int64 -> NominalDiffTime
-fromMicroseconds = view (from microseconds)
+fromMicroseconds = NominalDiffTime
 {-# INLINE fromMicroseconds #-}
 
 instance AdditiveGroup NominalDiffTime where
