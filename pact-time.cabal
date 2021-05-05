@@ -55,7 +55,7 @@ library
         Data.Time.System
     build-depends:
         -- external
-          base >=4.11 && <4.15
+          base >=4.11 && <4.16
         , attoparsec >= 0.13
         , bytestring >=0.10
         , deepseq >=1.4

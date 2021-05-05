@@ -264,9 +264,9 @@ monthDay leap = iso fromOrdinal toOrdinal
 -- Week Date
 
 data WeekDate = WeekDate
-    { _wdYear :: {-# UNPACK #-}! Year
-    , _wdWeek :: {-# UNPACK #-}! WeekOfYear
-    , _wdDay :: {-# UNPACK #-}! DayOfWeek
+    { _wdYear :: {-# UNPACK #-} !Year
+    , _wdWeek :: {-# UNPACK #-} !WeekOfYear
+    , _wdDay :: {-# UNPACK #-} !DayOfWeek
     }
 
 weekDate :: Iso' Day WeekDate
