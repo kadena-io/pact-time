@@ -19,8 +19,11 @@
 --
 module Data.Time.Internal
 (
+  Micros
+, Day
+
 -- * NominalDiffTime
-  NominalDiffTime(..)
+, NominalDiffTime(..)
 , toMicroseconds
 , fromMicroseconds
 , toSeconds
@@ -67,24 +70,30 @@ import Lens.Micro
 import Data.Time.System
 
 -- -------------------------------------------------------------------------- --
+-- Types for internal representations
+
+type Micros = Int64
+type Day = Int
+
+-- -------------------------------------------------------------------------- --
 -- Nominal Diff Time
 
 -- | A time interval as measured by UTC, that does not take leap-seconds into
 -- account.
 --
-newtype NominalDiffTime = NominalDiffTime { _microseconds :: Int64 }
-    deriving (Eq, Ord, Bounded)
+newtype NominalDiffTime = NominalDiffTime { _microseconds :: Micros }
+    deriving (Eq, Ord)
     deriving newtype (NFData)
 
 -- | Convert from 'NominalDiffTime' to a 64-bit representation of microseconds.
 --
-toMicroseconds :: NominalDiffTime -> Int64
+toMicroseconds :: NominalDiffTime -> Micros
 toMicroseconds = _microseconds
 {-# INLINE toMicroseconds #-}
 
 -- | Convert from a 64-bit representation of microseconds to 'NominalDiffTime'.
 --
-fromMicroseconds :: Int64 -> NominalDiffTime
+fromMicroseconds :: Micros -> NominalDiffTime
 fromMicroseconds = NominalDiffTime
 {-# INLINE fromMicroseconds #-}
 
@@ -133,11 +142,11 @@ nominalDay :: NominalDiffTime
 nominalDay = NominalDiffTime $ 86400 * 1000000
 {-# INLINE nominalDay #-}
 
-toPosixTimestampMicros :: UTCTime -> Int64
+toPosixTimestampMicros :: UTCTime -> Micros
 toPosixTimestampMicros = toTimestampMicros . toPosix
 {-# INLINE toPosixTimestampMicros #-}
 
-fromPosixTimestampMicros :: Int64 -> UTCTime
+fromPosixTimestampMicros :: Micros -> UTCTime
 fromPosixTimestampMicros = fromPosix . fromTimestampMicros
 {-# INLINE fromPosixTimestampMicros #-}
 
@@ -153,7 +162,7 @@ fromPosixTimestampMicros = fromPosix . fromTimestampMicros
 -- generally equal or smaller than what is actually measured by a clock.
 --
 newtype UTCTime = UTCTime { _utcTime :: NominalDiffTime }
-    deriving (Eq, Ord, Bounded)
+    deriving (Eq, Ord)
     deriving (Generic)
     deriving newtype (NFData)
     deriving newtype (Serialize)
@@ -222,18 +231,18 @@ mjdEpoch = UTCTime zeroV
 -- 'UTCTime' with 'toPosxiTimestampMicros' and 'fromPosixTimestampMicros'.
 --
 newtype POSIXTime = POSIXTime { _posixTime :: NominalDiffTime }
-    deriving (Eq, Ord, Bounded)
+    deriving (Eq, Ord)
     deriving newtype (NFData)
 
 -- | Represent POSIXTime as 64-bit value of microseconds since 'posixEpoch'.
 --
-toTimestampMicros :: POSIXTime -> Int64
+toTimestampMicros :: POSIXTime -> Micros
 toTimestampMicros = _microseconds . _posixTime
 {-# INLINE toTimestampMicros #-}
 
 -- | Create POSIXTime from 64-bit value of microseconds since 'posixEpoch'.
 --
-fromTimestampMicros :: Int64 -> POSIXTime
+fromTimestampMicros :: Micros -> POSIXTime
 fromTimestampMicros = POSIXTime . fromMicroseconds
 {-# INLINE fromTimestampMicros #-}
 
@@ -246,7 +255,7 @@ posixEpochDay = ModifiedJulianDay 40587
 -- | Get current POSIX time
 --
 getPOSIXTime :: IO POSIXTime
-getPOSIXTime = POSIXTime . NominalDiffTime <$> getSystemTimeMicros
+getPOSIXTime = POSIXTime . NominalDiffTime . fromIntegral <$> getSystemTimeMicros
 {-# INLINE getPOSIXTime #-}
 
 -- The following conversions between POSIXTime and UTCTime are efficient because
@@ -267,7 +276,7 @@ fromPosix p = UTCTime $ _posixTime p ^+^ _utcTime posixEpoch
 -- -------------------------------------------------------------------------- --
 -- Modified Julian Day Representation of UTC
 
-newtype ModifiedJulianDay = ModifiedJulianDay Int
+newtype ModifiedJulianDay = ModifiedJulianDay Day
     deriving newtype (Eq, Ord, NFData)
 
 -- | Modified Julian Day Representation of UTC

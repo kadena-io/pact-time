@@ -92,7 +92,7 @@ showsYear n@(abs -> u)
     neg = if n < 0 then (:) '-' else id
 {-# INLINE showsYear #-}
 
-fills06 :: Int64 -> ShowS
+fills06 :: Micros -> ShowS
 fills06 n
     | n < 10 = (++) "00000"
     | n < 100 = (++) "0000"
@@ -102,7 +102,7 @@ fills06 n
     | otherwise = id
 {-# INLINE fills06 #-}
 
-drops0 :: Int64 -> ShowS
+drops0 :: Micros -> ShowS
 drops0 n = case divMod n 10 of
     (q, 0) -> drops0 q
     _ -> shows n
@@ -111,17 +111,25 @@ drops0 n = case divMod n 10 of
 -- -------------------------------------------------------------------------- --
 -- Misc Types
 
-type Minutes = Int
-type Days = Int
+-- Unbounded
+type UnboundedInt = Int
 
-type Hour = Int
-type Minute = Int
-type Month = Int
-type DayOfMonth = Int
-type Year = Int
-type DayOfYear = Int
-type DayOfWeek = Int
-type WeekOfYear = Int
+type Minutes = UnboundedInt
+type Days = UnboundedInt
+type Year = UnboundedInt
+type Century = UnboundedInt
+
+-- Bounded
+type BoundedInt = Int
+
+type Hour = BoundedInt
+type Minute = BoundedInt
+type Second = BoundedInt
+type Month = BoundedInt
+type DayOfMonth = BoundedInt
+type DayOfYear = BoundedInt
+type DayOfWeek = BoundedInt
+type WeekOfYear = BoundedInt
 
 -- -------------------------------------------------------------------------- --
 -- Year Month Day
@@ -135,7 +143,7 @@ data YearMonthDay = YearMonthDay
 ymdFromOrdinal :: OrdinalDate -> YearMonthDay
 ymdFromOrdinal (OrdinalDate y yd) = YearMonthDay y m d
   where
-    MonthDay m d = monthDaysFromDayOfYear (isLeapYear y) $ yd
+    MonthDay m d = monthDaysFromDayOfYear (isLeapYear y) yd
 {-# INLINEABLE ymdFromOrdinal #-}
 
 ymdToOrdinal :: YearMonthDay -> OrdinalDate
@@ -172,7 +180,6 @@ toOrdinalDate (ModifiedJulianDay mjd)
     (quadCent, dayInQC) = dayB0 `divMod` 146097
 
     -- Input: days since 1-1-1. Precondition: has to be positive!
-    toOrdB0 :: Int -> OrdinalDate
     toOrdB0 dB0 = res
       where
         (y0, r) = (400 * dB0) `quotRem` 146097
@@ -185,7 +192,6 @@ toOrdinalDate (ModifiedJulianDay mjd)
 
     -- Input: (year - 1) (day as days since 1-1-1)
     -- Precondition: year is positive!
-    dayInYear :: Int -> Int -> Int
     dayInYear y0 dB0 = dB0 - 365 * y0 - leaps + 1
       where
         leaps = y0 `shiftR` 2 - centuries + centuries `shiftR` 2
@@ -289,10 +295,10 @@ toWeekOrdinal (OrdinalDate y0 yd) (ModifiedJulianDay mjd) =
     d = mjd + 2
     (d7div, d7mod) = divMod d 7
 
-    foo :: Year -> {-WeekOfYear-1-}Int
+    -- foo :: Year -> {-WeekOfYear-1-}Int
     foo y = bar $ fromOrdinalDate $ OrdinalDate y 6
 
-    bar :: ModifiedJulianDay -> {-WeekOfYear-1-}Int
+    -- bar :: ModifiedJulianDay -> {-WeekOfYear-1-}Int
     bar (ModifiedJulianDay k) = d7div - div k 7
 
     w0 = bar $ ModifiedJulianDay (d - yd + 4)
@@ -587,7 +593,7 @@ instance FormatTime ModifiedJulianDay where
 
 instance FormatTime ModifiedJulianDate where
     showsTime (ModifiedJulianDate d dt) =
-        (showsTime d . showsTime (timeOfDayFromNominalDiffTime dt))
+        showsTime d . showsTime (timeOfDayFromNominalDiffTime dt)
     {-# INLINEABLE showsTime #-}
 
 instance FormatTime UTCTime where
@@ -635,7 +641,7 @@ parserToReadS = go . P.parse
 {-# INLINEABLE parserToReadS #-}
 
 indexOfCI :: [String] -> Parser Int
-indexOfCI = P.choice . zipWith (\ i s -> i <$ stringCI s) [0..]
+indexOfCI = P.choice . zipWith (\i s -> i <$ stringCI s) [0..]
 {-# INLINE indexOfCI #-}
 
 -- | Case-insensitive UTF-8 ByteString parser
@@ -643,7 +649,7 @@ indexOfCI = P.choice . zipWith (\ i s -> i <$ stringCI s) [0..]
 -- Matches one character at a time. Slow.
 --
 stringCI :: String -> Parser ()
-stringCI = foldl (\ p c -> p *> charCI c) (pure ())
+stringCI = foldl (\p c -> p *> charCI c) (pure ())
 {-# INLINE stringCI #-}
 
 -- | Case-insensitive UTF-8 ByteString parser
@@ -652,7 +658,8 @@ stringCI = foldl (\ p c -> p *> charCI c) (pure ())
 -- instead we accept either one of @toUpper c@ and @toLower c@.
 --
 charCI :: Char -> Parser ()
-charCI c = if u == l then charU8 c else charU8 l <|> charU8 u where
+charCI c = if u == l then charU8 c else charU8 l <|> charU8 u
+  where
     l = toLower c
     u = toUpper c
 {-# INLINE charCI #-}
@@ -717,7 +724,7 @@ data TimeFlag
     deriving (Enum, Show)
 
 data TimeParse = TimeParse
-    { _tpCentury :: {-# UNPACK #-} !Int
+    { _tpCentury :: {-# UNPACK #-} !Century
     , _tpCenturyYear :: {-# UNPACK #-} !Int{-YearOfCentury-}
     , _tpMonth :: {-# UNPACK #-} !Month
     , _tpWeekOfYear :: {-# UNPACK #-} !WeekOfYear
@@ -727,7 +734,7 @@ data TimeParse = TimeParse
     , _tpFlags :: {-# UNPACK #-} !Int{-BitSet TimeFlag-}
     , _tpHour :: {-# UNPACK #-} !Hour
     , _tpMinute :: {-# UNPACK #-} !Minute
-    , _tpSecond :: {-# UNPACK #-} !Int
+    , _tpSecond :: {-# UNPACK #-} !Second
     , _tpSecFrac :: {-# UNPACK #-} !NominalDiffTime
     , _tpPOSIXTime :: {-# UNPACK #-} !NominalDiffTime
     , _tpTimeZone :: !TimeZone
