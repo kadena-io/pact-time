@@ -37,11 +37,12 @@ import Data.Time.Internal
 toUtcTime :: UTCTime -> T.UTCTime
 toUtcTime t = T.UTCTime (T.ModifiedJulianDay (fromIntegral d)) $ realToFrac dt / 1000000
   where
-    Julian (ModifiedJulianDay d) (NominalDiffTime dt) = toJulian t
+    ModifiedJulianDate (ModifiedJulianDay d) (NominalDiffTime dt)
+        = toModifiedJulianDate t
 
 fromUtcTime :: T.UTCTime -> UTCTime
-fromUtcTime (T.UTCTime (T.ModifiedJulianDay d) t) = fromJulian
-    $ Julian (ModifiedJulianDay (fromIntegral d)) (NominalDiffTime $ round (t * 1000000))
+fromUtcTime (T.UTCTime (T.ModifiedJulianDay d) t) = fromModifiedJulianDate
+    $ ModifiedJulianDate (ModifiedJulianDay (fromIntegral d)) (NominalDiffTime $ round (t * 1000000))
 
 -- -------------------------------------------------------------------------- --
 -- Formatting and Parsing

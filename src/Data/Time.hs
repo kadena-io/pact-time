@@ -11,7 +11,7 @@
 -- Language](https://github.com/kadena-io/pact/).
 --
 -- The focus of this library is on minimality, performance, and binary level
--- stability. Time is represented as 64-bit integral value that counts
+-- stability. Time is represented as 64-bit integral value that counts nominal
 -- micro-seconds since the modified Julian date epoch (MJD). The implementation
 -- ignores leap seconds.
 --
@@ -26,10 +26,8 @@ module Data.Time
 (
 -- * NominalDiffTime
   NominalDiffTime(..)
-, microseconds
 , toMicroseconds
 , fromMicroseconds
-, seconds
 , toSeconds
 , fromSeconds
 , nominalDay
@@ -42,32 +40,12 @@ module Data.Time
 , fromDayAndDayTime
 , toPosixTimestampMicros
 , fromPosixTimestampMicros
+, posixEpoch
+, mjdEpoch
 
--- ** Formatting and Parsing
+-- * Formatting and Parsing
 , parseTime
 , formatTime
-
--- * Julian Dates
-, Day(..)
-, Julian(..)
-, julianDay
-, julianDayTime
-, julianEpoch
-, toJulian
-, fromJulian
-, julian
-, julianEpochUtc
-
--- * POSIX Time
-, POSIXTime
-, toTimestampMicros
-, fromTimestampMicros
-, getPOSIXTime
-, posixEpoch
-, posixEpochUtc
-, posixEpochDay
-, fromPosix
-, toPosix
 
 -- * Reexports
 , AffineSpace(..)

@@ -21,10 +21,8 @@ module Data.Time.Internal
 (
 -- * NominalDiffTime
   NominalDiffTime(..)
-, microseconds
 , toMicroseconds
 , fromMicroseconds
-, seconds
 , toSeconds
 , fromSeconds
 , nominalDay
@@ -37,28 +35,14 @@ module Data.Time.Internal
 , fromDayAndDayTime
 , toPosixTimestampMicros
 , fromPosixTimestampMicros
+, mjdEpoch
+, posixEpoch
 
 -- * Julian Dates
-, Day(..)
-, Julian(..)
-, julianDay
-, julianDayTime
-, julianEpoch
-, toJulian
-, fromJulian
-, julian
-, julianEpochUtc
-
--- * POSIX Time
-, POSIXTime(..)
-, toTimestampMicros
-, fromTimestampMicros
-, getPOSIXTime
-, posixEpoch
-, posixEpochUtc
-, posixEpochDay
-, fromPosix
-, toPosix
+, ModifiedJulianDay(..)
+, ModifiedJulianDate(..)
+, toModifiedJulianDate
+, fromModifiedJulianDate
 
 -- * Reexports
 , AffineSpace(..)
@@ -66,7 +50,6 @@ module Data.Time.Internal
 ) where
 
 import Control.DeepSeq
-import Control.Lens
 
 import Data.AdditiveGroup
 import Data.AffineSpace
@@ -76,6 +59,8 @@ import Data.VectorSpace
 
 import GHC.Generics hiding (from)
 import GHC.Int (Int64)
+
+import Lens.Micro
 
 -- internal modules
 
@@ -90,13 +75,6 @@ import Data.Time.System
 newtype NominalDiffTime = NominalDiffTime { _microseconds :: Int64 }
     deriving (Eq, Ord, Bounded)
     deriving newtype (NFData)
-
--- | Convert between 'NominalDiffTime' and 64-bit representation of
--- microseconds.
---
-microseconds :: Iso' NominalDiffTime Int64
-microseconds = iso toMicroseconds fromMicroseconds
-{-# INLINE microseconds #-}
 
 -- | Convert from 'NominalDiffTime' to a 64-bit representation of microseconds.
 --
@@ -134,16 +112,6 @@ instance Serialize NominalDiffTime where
     {-# INLINE put #-}
     {-# INLINE get #-}
 
--- | Convert between 'NominalDiffTime' and a 'Decimal' representation of
--- seconds.
---
--- The result of the conversion from 'Decimal' to 'NominalDiffTime' is rounded
--- using banker's method, i.e. remainders of 0.5 a rounded to the next even
--- integer.
---
-seconds :: Iso' NominalDiffTime Decimal
-seconds = iso toSeconds fromSeconds
-
 -- | Convert from 'NominalDiffTime' to a 'Decimal' representation of seconds.
 --
 toSeconds :: NominalDiffTime -> Decimal
@@ -174,88 +142,15 @@ fromPosixTimestampMicros = fromPosix . fromTimestampMicros
 {-# INLINE fromPosixTimestampMicros #-}
 
 -- -------------------------------------------------------------------------- --
--- POSIX Timestamps
-
--- | POSIX Time represents time as 64 bit value of microseconds since
--- 'posixEpoch'.
---
--- Internally this is just UTCTime offset by 'posixEpochUtc'.
---
--- Most users will only use the functions 'toTimestampMicros' and
--- 'fromTimestampMicros'.
---
-newtype POSIXTime = POSIXTime { _posixTime :: NominalDiffTime }
-    deriving (Eq, Ord, Bounded)
-    deriving newtype (NFData)
-
-instance AffineSpace POSIXTime where
-    type Diff POSIXTime = NominalDiffTime
-    POSIXTime a .-. POSIXTime b = a ^-^ b
-    POSIXTime a .+^ b = POSIXTime (a ^+^ b)
-    {-# INLINE (.-.) #-}
-    {-# INLINE (.+^) #-}
-
--- | Represent POSIXTime as 64-bit value of microseconds since 'posixEpoch'.
---
-toTimestampMicros :: POSIXTime -> Int64
-toTimestampMicros = _microseconds . _posixTime
-{-# INLINE toTimestampMicros #-}
-
--- | Create POSIXTime from 64-bit value of microseconds since 'posixEpoch'.
---
-fromTimestampMicros :: Int64 -> POSIXTime
-fromTimestampMicros = POSIXTime . fromMicroseconds
-{-# INLINE fromTimestampMicros #-}
-
--- | POSIX Epoch
---
-posixEpoch :: POSIXTime
-posixEpoch = POSIXTime zeroV
-{-# INLINE posixEpoch #-}
-
--- | The POSIX Epoch represented as UTCTime.
---
-posixEpochUtc :: UTCTime
-posixEpochUtc = UTCTime (fromIntegral d *^ nominalDay)
-  where
-    ModifiedJulianDay d = posixEpochDay
-{-# INLINE posixEpochUtc #-}
-
--- | The day of the epoch of 'SystemTime', 1970-01-01
---
-posixEpochDay :: Day
-posixEpochDay = ModifiedJulianDay 40587
-{-# INLINE posixEpochDay #-}
-
--- | Get current POSIX time
---
-getPOSIXTime :: IO POSIXTime
-getPOSIXTime = POSIXTime . NominalDiffTime <$> getSystemTimeMicros
-{-# INLINE getPOSIXTime #-}
-
--- The following conversions between POSIXTime and UTCTime are efficient because
--- all constants are inlined.
-
--- | Convert from UTCTime to POSIXTime
---
-toPosix :: UTCTime -> POSIXTime
-toPosix t = POSIXTime $ _utcTime t ^-^ _utcTime posixEpochUtc
-{-# INLINE toPosix #-}
-
--- | Convert from POSIXTime to UTCTime
---
-fromPosix :: POSIXTime -> UTCTime
-fromPosix p = UTCTime $ _posixTime p ^+^ _utcTime posixEpochUtc
-{-# INLINE fromPosix #-}
-
--- -------------------------------------------------------------------------- --
 -- UTCTime
 
--- UTCTime with microseconds precision.
+-- | UTCTime with microseconds precision. Internally it is represented as 64-bit
+-- count nominal microseconds since MJD Epoch.
 --
--- Represented as 64 bit count since Microseconds since MJD Epoch.
---
--- This implementation ignores Leap seconds.
+-- This implementation ignores leap seconds. Time differences are  measured as
+-- nominal time, with a nominal day having exaxtly @24 * 60 * 60@ SI seconds. As
+-- a consequence the difference between two dates as computed by this module is
+-- generally equal or smaller than what is actually measured by a clock.
 --
 newtype UTCTime = UTCTime { _utcTime :: NominalDiffTime }
     deriving (Eq, Ord, Bounded)
@@ -271,21 +166,25 @@ instance AffineSpace UTCTime where
     {-# INLINE (.+^) #-}
 
 getCurrentTime :: IO UTCTime
-getCurrentTime = UTCTime . (^+^ _utcTime posixEpochUtc) . _posixTime
+getCurrentTime = UTCTime . (^+^ _utcTime posixEpoch) . _posixTime
     <$> getPOSIXTime
 {-# INLINE getCurrentTime #-}
 
 -- | The date of a UTCTime value represented as modified Julian 'Day'.
 --
-day :: Lens' UTCTime Day
-day = julian . julianDay
+day :: Lens' UTCTime ModifiedJulianDay
+day = lens
+    (_mjdDay . toModifiedJulianDate)
+    (\a b -> fromModifiedJulianDate . set mjdDay b $ toModifiedJulianDate a)
 {-# INLINE day #-}
 
 -- | The day time of a 'UTCTime' value represented as 'NominalDiffTime' since
 -- @00:00:00@ of that respective day.
 --
 dayTime :: Lens' UTCTime NominalDiffTime
-dayTime = julian . julianDayTime
+dayTime = lens
+    (_mjdTime . toModifiedJulianDate)
+    (\a b -> fromModifiedJulianDate . set mjdTime b $ toModifiedJulianDate a)
 {-# INLINE dayTime #-}
 
 -- | Create a 'UTCTime' from a date and a daytime. The date is represented
@@ -295,66 +194,114 @@ dayTime = julian . julianDayTime
 -- Note that this implementation does not support representation of leap
 -- seconds.
 --
-fromDayAndDayTime :: Day -> NominalDiffTime -> UTCTime
-fromDayAndDayTime d t = fromJulian $ Julian d t
+fromDayAndDayTime :: ModifiedJulianDay -> NominalDiffTime -> UTCTime
+fromDayAndDayTime d t = fromModifiedJulianDate $ ModifiedJulianDate d t
 {-# INLINE fromDayAndDayTime #-}
+
+-- | The POSIX Epoch represented as UTCTime.
+--
+posixEpoch :: UTCTime
+posixEpoch = UTCTime (fromIntegral d *^ nominalDay)
+  where
+    ModifiedJulianDay d = posixEpochDay
+{-# INLINE posixEpoch #-}
+
+-- | The Epoch of the modified Julian day represented as 'UTCTime'.
+--
+mjdEpoch :: UTCTime
+mjdEpoch = UTCTime zeroV
+{-# INLINE mjdEpoch #-}
+
+-- -------------------------------------------------------------------------- --
+-- POSIX Timestamps
+
+-- | POSIX time is the nominal time since 1970-01-01 00:00 UTC. It is
+-- represented as 64-bit count of microseconds.
+--
+-- Users who only need POSIX timestamps can ignore this type and just use
+-- 'UTCTime' with 'toPosxiTimestampMicros' and 'fromPosixTimestampMicros'.
+--
+newtype POSIXTime = POSIXTime { _posixTime :: NominalDiffTime }
+    deriving (Eq, Ord, Bounded)
+    deriving newtype (NFData)
+
+-- | Represent POSIXTime as 64-bit value of microseconds since 'posixEpoch'.
+--
+toTimestampMicros :: POSIXTime -> Int64
+toTimestampMicros = _microseconds . _posixTime
+{-# INLINE toTimestampMicros #-}
+
+-- | Create POSIXTime from 64-bit value of microseconds since 'posixEpoch'.
+--
+fromTimestampMicros :: Int64 -> POSIXTime
+fromTimestampMicros = POSIXTime . fromMicroseconds
+{-# INLINE fromTimestampMicros #-}
+
+-- | The day of the epoch of 'SystemTime', 1970-01-01
+--
+posixEpochDay :: ModifiedJulianDay
+posixEpochDay = ModifiedJulianDay 40587
+{-# INLINE posixEpochDay #-}
+
+-- | Get current POSIX time
+--
+getPOSIXTime :: IO POSIXTime
+getPOSIXTime = POSIXTime . NominalDiffTime <$> getSystemTimeMicros
+{-# INLINE getPOSIXTime #-}
+
+-- The following conversions between POSIXTime and UTCTime are efficient because
+-- all constants are inlined.
+
+-- | Convert from UTCTime to POSIXTime
+--
+toPosix :: UTCTime -> POSIXTime
+toPosix t = POSIXTime $ _utcTime t ^-^ _utcTime posixEpoch
+{-# INLINE toPosix #-}
+
+-- | Convert from POSIXTime to UTCTime
+--
+fromPosix :: POSIXTime -> UTCTime
+fromPosix p = UTCTime $ _posixTime p ^+^ _utcTime posixEpoch
+{-# INLINE fromPosix #-}
 
 -- -------------------------------------------------------------------------- --
 -- Modified Julian Day Representation of UTC
 
-newtype Day = ModifiedJulianDay Int
+newtype ModifiedJulianDay = ModifiedJulianDay Int
     deriving newtype (Eq, Ord, NFData)
 
 -- | Modified Julian Day Representation of UTC
 --
-data Julian = Julian
-    { _julianDay :: !Day
-    , _julianDayTime :: !NominalDiffTime
+data ModifiedJulianDate = ModifiedJulianDate
+    { _mjdDay :: !ModifiedJulianDay
+    , _mjdTime :: !NominalDiffTime
     }
     deriving (Eq, Ord, Generic)
     deriving anyclass (NFData)
 
-julianDay :: Lens' Julian Day
-julianDay = lens _julianDay $ \a b -> a { _julianDay = b }
-{-# INLINE julianDay #-}
+mjdDay :: Lens' ModifiedJulianDate ModifiedJulianDay
+mjdDay = lens _mjdDay $ \a b -> a { _mjdDay = b }
+{-# INLINE mjdDay #-}
 
-julianDayTime :: Lens' Julian NominalDiffTime
-julianDayTime = lens _julianDayTime $ \a b -> a { _julianDayTime = b }
-{-# INLINE julianDayTime #-}
-
--- | The Epoch of the modified Julian day.
---
-julianEpoch :: Julian
-julianEpoch = Julian (ModifiedJulianDay 0) zeroV
-{-# INLINE julianEpoch #-}
-
--- | The Epoch of the modified Julian day represented as 'UTCTime'.
---
-julianEpochUtc :: UTCTime
-julianEpochUtc = UTCTime zeroV
-{-# INLINE julianEpochUtc #-}
+mjdTime :: Lens' ModifiedJulianDate NominalDiffTime
+mjdTime = lens _mjdTime $ \a b -> a { _mjdTime = b }
+{-# INLINE mjdTime #-}
 
 -- | Convert from 'UTCTime' to modified 'Julian' Day time.
 --
-toJulian :: UTCTime -> Julian
-toJulian (UTCTime (NominalDiffTime m)) = Julian
+toModifiedJulianDate :: UTCTime -> ModifiedJulianDate
+toModifiedJulianDate (UTCTime (NominalDiffTime m)) = ModifiedJulianDate
     (ModifiedJulianDay (fromIntegral d))
     (NominalDiffTime t)
   where
     (d, t) = divMod m n
     NominalDiffTime n = nominalDay
-{-# INLINE toJulian #-}
+{-# INLINE toModifiedJulianDate #-}
 
 -- | Convert from modified 'Julian' Day time to 'UTCTime'.
 --
-fromJulian :: Julian -> UTCTime
-fromJulian (Julian (ModifiedJulianDay d) t)
+fromModifiedJulianDate :: ModifiedJulianDate -> UTCTime
+fromModifiedJulianDate (ModifiedJulianDate (ModifiedJulianDay d) t)
     = UTCTime $ (fromIntegral d *^ nominalDay) ^+^ t
-{-# INLINE fromJulian #-}
-
--- | Convert between 'UTCTime' and modified 'Julian' Day time.
---
-julian :: Iso' UTCTime Julian
-julian = iso toJulian fromJulian
-{-# INLINE julian #-}
+{-# INLINE fromModifiedJulianDate #-}
 

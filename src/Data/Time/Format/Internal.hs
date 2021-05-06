@@ -27,7 +27,6 @@ module Data.Time.Format.Internal
 ) where
 
 import Control.Applicative
-import Control.Lens
 import Control.Monad.State.Strict
 
 import Data.Aeson (FromJSON(..), ToJSON(..), withText, Value(String))
@@ -45,10 +44,25 @@ import qualified Data.Text.Encoding as Text
 import qualified Data.Vector.Unboxed as VU
 import Data.VectorSpace
 
+import Lens.Micro
+
 -- internal modules
 
 import Data.Time.Internal
 import Data.Time.Format.Locale
+
+-- -------------------------------------------------------------------------- --
+-- Lens Utils (from microlens-mtl)
+
+infix 4 .=
+
+(.=) :: MonadState s m => ASetter s s a b -> b -> m ()
+l .= x = modify (l .~ x)
+{-# INLINE (.=) #-}
+
+assign :: MonadState s m => ASetter s s a b -> b -> m ()
+assign l x = l .= x
+{-# INLINE assign #-}
 
 -- -------------------------------------------------------------------------- --
 -- Misc Utils
@@ -118,25 +132,21 @@ data YearMonthDay = YearMonthDay
     , _ymdDay :: {-# UNPACK #-} !DayOfMonth
     }
 
-yearMonthDay :: Iso' OrdinalDate YearMonthDay
-yearMonthDay = iso fromOrdinal toOrdinal
+ymdFromOrdinal :: OrdinalDate -> YearMonthDay
+ymdFromOrdinal (OrdinalDate y yd) = YearMonthDay y m d
   where
+    MonthDay m d = monthDaysFromDayOfYear (isLeapYear y) $ yd
+{-# INLINEABLE ymdFromOrdinal #-}
 
-    fromOrdinal :: OrdinalDate -> YearMonthDay
-    fromOrdinal (OrdinalDate y yd) = YearMonthDay y m d
-      where
-        MonthDay m d = yd ^. monthDay (isLeapYear y)
-    {-# INLINEABLE fromOrdinal #-}
+ymdToOrdinal :: YearMonthDay -> OrdinalDate
+ymdToOrdinal (YearMonthDay y m d) = OrdinalDate y $
+    monthDaysToDayOfYear (isLeapYear y) (MonthDay m d)
 
-    toOrdinal :: YearMonthDay -> OrdinalDate
-    toOrdinal (YearMonthDay y m d) = OrdinalDate y $
-        monthDay (isLeapYear y) # MonthDay m d
-    {-# INLINEABLE toOrdinal #-}
-{-# INLINE yearMonthDay #-}
+{-# INLINEABLE ymdToOrdinal #-}
 
-gregorian :: Iso' Day YearMonthDay
-gregorian = ordinalDate . yearMonthDay
-{-# INLINE gregorian #-}
+toGregorian :: YearMonthDay -> ModifiedJulianDay
+toGregorian = fromOrdinalDate . ymdToOrdinal
+{-# INLINEABLE toGregorian #-}
 
 -- -------------------------------------------------------------------------- --
 -- Ordinal Dates
@@ -152,51 +162,48 @@ isLeapYear y = y .&. 3 == 0 && (r100 /= 0 || q100 .&. 3 == 0)
   where
     (q100, r100) = y `quotRem` 100
 
-ordinalDate :: Iso' Day OrdinalDate
-ordinalDate = iso toOrd fromOrd
+toOrdinalDate :: ModifiedJulianDay -> OrdinalDate
+toOrdinalDate (ModifiedJulianDay mjd)
+    | dayB0 <= 0 = case toOrdB0 dayInQC of
+        OrdinalDate y yd -> OrdinalDate (y + quadCent * 400) yd
+    | otherwise = toOrdB0 dayB0
   where
-    toOrd :: Day -> OrdinalDate
-    toOrd (ModifiedJulianDay mjd)
-        | dayB0 <= 0 = case toOrdB0 dayInQC of
-            OrdinalDate y yd -> OrdinalDate (y + quadCent * 400) yd
-        | otherwise = toOrdB0 dayB0
-      where
-        dayB0 = mjd + 678575
-        (quadCent, dayInQC) = dayB0 `divMod` 146097
-    {-# INLINEABLE toOrd #-}
+    dayB0 = mjd + 678575
+    (quadCent, dayInQC) = dayB0 `divMod` 146097
 
     -- Input: days since 1-1-1. Precondition: has to be positive!
     toOrdB0 :: Int -> OrdinalDate
-    toOrdB0 dayB0 = res
+    toOrdB0 dB0 = res
       where
-        (y0, r) = (400 * dayB0) `quotRem` 146097
-        d0 = dayInYear y0 dayB0
-        d1 = dayInYear (y0 + 1) dayB0
+        (y0, r) = (400 * dB0) `quotRem` 146097
+        d0 = dayInYear y0 dB0
+        d1 = dayInYear (y0 + 1) dB0
         res = if r > 146097 - 600 && d1 > 0
-              then OrdinalDate (y0 + 1 + 1) d1
-              else OrdinalDate (y0 + 1) d0
+                then OrdinalDate (y0 + 1 + 1) d1
+                else OrdinalDate (y0 + 1) d0
     {-# INLINE toOrdB0 #-}
 
     -- Input: (year - 1) (day as days since 1-1-1)
     -- Precondition: year is positive!
     dayInYear :: Int -> Int -> Int
-    dayInYear y0 dayB0 = dayB0 - 365 * y0 - leaps + 1
+    dayInYear y0 dB0 = dB0 - 365 * y0 - leaps + 1
       where
         leaps = y0 `shiftR` 2 - centuries + centuries `shiftR` 2
         centuries = y0 `quot` 100
     {-# INLINE dayInYear #-}
+{-# INLINEABLE toOrdinalDate #-}
 
-    fromOrd :: OrdinalDate -> Day
-    fromOrd (OrdinalDate year yd) = ModifiedJulianDay mjd
-      where
-        years = year - 1
-        centuries = years `div` 100
-        leaps = years `shiftR` 2 - centuries + centuries `shiftR` 2
-        mjd = 365 * years + leaps - 678576
-            + clip 1 (if isLeapYear year then 366 else 365) yd
-        clip a b = max a . min b
-    {-# INLINEABLE fromOrd #-}
-{-# INLINE ordinalDate #-}
+
+fromOrdinalDate :: OrdinalDate -> ModifiedJulianDay
+fromOrdinalDate (OrdinalDate year yd) = ModifiedJulianDay mjd
+  where
+    years = year - 1
+    centuries = years `div` 100
+    leaps = years `shiftR` 2 - centuries + centuries `shiftR` 2
+    mjd = 365 * years + leaps - 678576
+        + clip 1 (if isLeapYear year then 366 else 365) yd
+    clip a b = max a . min b
+{-# INLINEABLE fromOrdinalDate #-}
 
 -- -------------------------------------------------------------------------- --
 -- Months
@@ -208,7 +215,6 @@ monthLengths     = VU.fromList [31,28,31,30,31,30,31,31,30,31,30,31]
 monthLengthsLeap :: VU.Vector Days
 monthLengthsLeap = VU.fromList [31,29,31,30,31,30,31,31,30,31,30,31]
 {-# NOINLINE monthLengthsLeap #-}
-                            -- J  F  M  A  M  J  J  A  S  O  N  D
 
 monthDays :: VU.Vector ({-Month-}Int8, {-DayOfMonth-}Int8)
 monthDays = VU.generate 365 go
@@ -235,30 +241,28 @@ data MonthDay = MonthDay
     , _mdDay :: {-# UNPACK #-} !DayOfMonth
     }
 
--- | Convert between day of year in the Gregorian or Julian calendars, and
--- month and day of month. First arg is leap year flag.
-monthDay :: Bool -> Iso' DayOfYear MonthDay
-monthDay leap = iso fromOrdinal toOrdinal
+monthDaysFromDayOfYear :: Bool -> DayOfYear -> MonthDay
+monthDaysFromDayOfYear leap yd = MonthDay m d
   where
-    (lastDay, lengths, table, ok) = if leap
-        then (365, monthLengthsLeap, monthDaysLeap, -1)
-        else (364, monthLengths, monthDays, -2)
+    i = max 0 . min lastDay $ pred yd
+    (fromIntegral -> m, fromIntegral -> d) = VU.unsafeIndex table i
+    (lastDay, table) = if leap
+      then (365, monthDaysLeap)
+      else (364, monthDays)
+{-# INLINE monthDaysFromDayOfYear #-}
 
-    fromOrdinal :: DayOfYear -> MonthDay
-    fromOrdinal (max 0 . min lastDay . pred -> i) = MonthDay m d
-      where
-        (fromIntegral -> m, fromIntegral -> d) = VU.unsafeIndex table i
-    {-# INLINE fromOrdinal #-}
+monthDaysToDayOfYear :: Bool -> MonthDay -> DayOfYear
+monthDaysToDayOfYear leap (MonthDay month mday) = div (367 * m - 362) 12 + k + d
+  where
+    m = max 1 . min 12 $ month
+    l = VU.unsafeIndex lengths (pred m)
+    d = max 1 . min l $ mday
+    k = if m <= 2 then 0 else ok
 
-    toOrdinal :: MonthDay -> DayOfYear
-    toOrdinal (MonthDay month mday) = div (367 * m - 362) 12 + k + d
-      where
-        m = max 1 . min 12 $ month
-        l = VU.unsafeIndex lengths (pred m)
-        d = max 1 . min l $ mday
-        k = if m <= 2 then 0 else ok
-    {-# INLINE toOrdinal #-}
-{-# INLINE monthDay #-}
+    (lengths, ok) = if leap
+      then (monthLengthsLeap, -1)
+      else (monthLengths, -2)
+{-# INLINE monthDaysToDayOfYear #-}
 
 -- -------------------------------------------------------------------------- --
 -- Week Date
@@ -269,47 +273,46 @@ data WeekDate = WeekDate
     , _wdDay :: {-# UNPACK #-} !DayOfWeek
     }
 
-weekDate :: Iso' Day WeekDate
-weekDate = iso toWeek fromWeek
-  where
-    toWeek :: Day -> WeekDate
-    toWeek = join (toWeekOrdinal . view ordinalDate)
-    {-# INLINEABLE toWeek #-}
+toWeekDate :: ModifiedJulianDay -> WeekDate
+toWeekDate = join (toWeekOrdinal . toOrdinalDate)
+{-# INLINEABLE toWeekDate #-}
 
-    fromWeek :: WeekDate -> Day
-    fromWeek wd@(WeekDate y _ _) = fromWeekLast (lastWeekOfYear y) wd
-    {-# INLINEABLE fromWeek #-}
-{-# INLINE toWeekOrdinal #-}
+fromWeekDate :: WeekDate -> ModifiedJulianDay
+fromWeekDate wd@(WeekDate y _ _) = fromWeekLast (lastWeekOfYear y) wd
+{-# INLINEABLE fromWeekDate #-}
 
-toWeekOrdinal :: OrdinalDate -> Day -> WeekDate
+toWeekOrdinal :: OrdinalDate -> ModifiedJulianDay -> WeekDate
 toWeekOrdinal (OrdinalDate y0 yd) (ModifiedJulianDay mjd) =
     WeekDate y1 (w1 + 1) (d7mod + 1)
   where
     -- pilfered and refactored; no idea what foo and bar mean
     d = mjd + 2
     (d7div, d7mod) = divMod d 7
+
     foo :: Year -> {-WeekOfYear-1-}Int
-    foo y = bar $ ordinalDate # OrdinalDate y 6
-    bar :: Day -> {-WeekOfYear-1-}Int
+    foo y = bar $ fromOrdinalDate $ OrdinalDate y 6
+
+    bar :: ModifiedJulianDay -> {-WeekOfYear-1-}Int
     bar (ModifiedJulianDay k) = d7div - div k 7
+
     w0 = bar $ ModifiedJulianDay (d - yd + 4)
     (y1, w1) = case w0 of
         -1 -> (y0 - 1, foo (y0 - 1))
         52 | foo (y0 + 1) == 0 -> (y0 + 1, 0)
         _ -> (y0, w0)
-{-# INLINE weekDate #-}
+{-# INLINE toWeekOrdinal #-}
 
 lastWeekOfYear :: Year -> WeekOfYear
 lastWeekOfYear y = if _wdWeek wd == 53 then 53 else 52
   where
-    wd = OrdinalDate y 365 ^. from ordinalDate . weekDate
+    wd = toWeekDate $ fromOrdinalDate $ OrdinalDate y 365
 {-# INLINE lastWeekOfYear #-}
 
-fromWeekLast :: WeekOfYear -> WeekDate -> Day
+fromWeekLast :: WeekOfYear -> WeekDate -> ModifiedJulianDay
 fromWeekLast wMax (WeekDate y w d) = ModifiedJulianDay mjd
   where
     -- pilfered and refactored
-    ModifiedJulianDay k = ordinalDate # OrdinalDate y 6
+    ModifiedJulianDay k = fromOrdinalDate $ OrdinalDate y 6
     mjd = k - mod k 7 - 10 + clip 1 7 d + clip 1 wMax w * 7
     clip a b = max a . min b
 {-# INLINE fromWeekLast #-}
@@ -328,24 +331,16 @@ data SundayWeek = SundayWeek
     , _swDay :: {-# UNPACK #-} !DayOfWeek
     }
 
-sundayWeek :: Iso' Day SundayWeek
-sundayWeek = iso toSunday fromSunday
+fromSundayWeek :: SundayWeek -> ModifiedJulianDay
+fromSundayWeek (SundayWeek y w d) = ModifiedJulianDay (firstDay + yd)
   where
-    toSunday :: Day -> SundayWeek
-    toSunday = join (toSundayOrdinal . view ordinalDate)
-    {-# INLINEABLE toSunday #-}
+    ModifiedJulianDay firstDay = fromOrdinalDate $ OrdinalDate y 1
+    -- following are all 0-based year days
+    firstSunday = mod (4 - firstDay) 7
+    yd = firstSunday + 7 * (w - 1) + d
+{-# INLINEABLE fromSundayWeek #-}
 
-    fromSunday :: SundayWeek -> Day
-    fromSunday (SundayWeek y w d) = ModifiedJulianDay (firstDay + yd)
-      where
-        ModifiedJulianDay firstDay = ordinalDate # OrdinalDate y 1
-        -- following are all 0-based year days
-        firstSunday = mod (4 - firstDay) 7
-        yd = firstSunday + 7 * (w - 1) + d
-    {-# INLINEABLE fromSunday #-}
-{-# INLINE sundayWeek #-}
-
-toSundayOrdinal :: OrdinalDate -> Day -> SundayWeek
+toSundayOrdinal :: OrdinalDate -> ModifiedJulianDay -> SundayWeek
 toSundayOrdinal (OrdinalDate y yd) (ModifiedJulianDay mjd) =
     SundayWeek y (d7div - div k 7) d7mod
   where
@@ -368,24 +363,16 @@ data MondayWeek = MondayWeek
     , _mwDay :: {-# UNPACK #-} !DayOfWeek
     }
 
-mondayWeek :: Iso' Day MondayWeek
-mondayWeek = iso toMonday fromMonday
+fromMondayWeek :: MondayWeek -> ModifiedJulianDay
+fromMondayWeek (MondayWeek y w d) = ModifiedJulianDay (firstDay + yd)
   where
-    toMonday :: Day -> MondayWeek
-    toMonday = join (toMondayOrdinal . view ordinalDate)
-    {-# INLINEABLE toMonday #-}
+    ModifiedJulianDay firstDay = fromOrdinalDate $ OrdinalDate y 1
+    -- following are all 0-based year days
+    firstMonday = mod (5 - firstDay) 7
+    yd = firstMonday + 7 * (w - 1) + d - 1
+{-# INLINEABLE fromMondayWeek #-}
 
-    fromMonday :: MondayWeek -> Day
-    fromMonday (MondayWeek y w d) = ModifiedJulianDay (firstDay + yd)
-      where
-        ModifiedJulianDay firstDay = ordinalDate # OrdinalDate y 1
-        -- following are all 0-based year days
-        firstMonday = mod (5 - firstDay) 7
-        yd = firstMonday + 7 * (w - 1) + d - 1
-    {-# INLINEABLE fromMonday #-}
-{-# INLINE mondayWeek #-}
-
-toMondayOrdinal :: OrdinalDate -> Day -> MondayWeek
+toMondayOrdinal :: OrdinalDate -> ModifiedJulianDay -> MondayWeek
 toMondayOrdinal (OrdinalDate y yd) (ModifiedJulianDay mjd) =
     MondayWeek y (d7div - div k 7) (d7mod + 1)
   where
@@ -403,23 +390,13 @@ data TimeOfDay = TimeOfDay
     , _todSec :: {-# UNPACK #-} !NominalDiffTime
     }
 
-timeOfDay :: Iso' NominalDiffTime TimeOfDay
-timeOfDay = iso fromDiff toDiff
+timeOfDayFromNominalDiffTime :: NominalDiffTime -> TimeOfDay
+timeOfDayFromNominalDiffTime (NominalDiffTime t) = TimeOfDay
+    (fromIntegral h) (fromIntegral m) (NominalDiffTime s)
   where
-    fromDiff :: NominalDiffTime -> TimeOfDay
-    fromDiff (NominalDiffTime t) = TimeOfDay
-        (fromIntegral h) (fromIntegral m) (NominalDiffTime s)
-      where
-        (h, ms) = quotRem t 3600000000
-        (m, s) = quotRem ms 60000000
-    {-# INLINEABLE fromDiff #-}
-
-    toDiff :: TimeOfDay -> NominalDiffTime
-    toDiff (TimeOfDay h m s) = s
-        ^+^ fromIntegral m *^ NominalDiffTime 60000000
-        ^+^ fromIntegral h *^ NominalDiffTime 3600000000
-    {-# INLINEABLE toDiff #-}
-{-# INLINE timeOfDay #-}
+    (h, ms) = quotRem t 3600000000
+    (m, s) = quotRem ms 60000000
+{-# INLINEABLE timeOfDayFromNominalDiffTime #-}
 
 -- -------------------------------------------------------------------------- --
 -- Format Time
@@ -476,7 +453,10 @@ instance FormatTime TimeOfDay where
         'M' -> shows02 m
         -- Second
         'S' -> shows02 si
+
+        -- TODO: Unsupported by Pact
         'q' -> fills06 su . shows su . (++) "000000"
+
         'v' -> fills06 su . shows su
         'Q' -> if su == 0 then id else (:) '.' . fills06 su . drops0 su
         -- default
@@ -596,23 +576,24 @@ instance FormatTime OrdinalDate where
 
 -- | Format Date that is represented as 'ModifiedJulianDay'
 --
-instance FormatTime Day where
-    showsTime d@(view ordinalDate -> ordinal)
+instance FormatTime ModifiedJulianDay where
+    showsTime d@(toOrdinalDate -> ordinal)
         = showsTime ordinal
-        . showsTime (ordinal ^. yearMonthDay)
+        . showsTime (ymdFromOrdinal ordinal)
         . showsTime (toWeekOrdinal ordinal d)
         . showsTime (toSundayOrdinal ordinal d)
         . showsTime (toMondayOrdinal ordinal d)
     {-# INLINEABLE showsTime #-}
 
-instance FormatTime Julian where
-    showsTime (Julian d dt) def c = (showsTime d . showsTime (dt ^. timeOfDay)) def c
+instance FormatTime ModifiedJulianDate where
+    showsTime (ModifiedJulianDate d dt) =
+        (showsTime d . showsTime (timeOfDayFromNominalDiffTime dt))
     {-# INLINEABLE showsTime #-}
 
 instance FormatTime UTCTime where
     showsTime t def c = case c of
         's' -> shows . fst $ quotRem (toPosixTimestampMicros t) 1000000
-        _ -> (showsTime (toJulian t) . formatUtcZone) def c
+        _ -> (showsTime (toModifiedJulianDate t) . formatUtcZone) def c
     {-# INLINEABLE showsTime #-}
 
 -- | Pact only supports UTC
@@ -748,11 +729,9 @@ data TimeParse = TimeParse
     , _tpMinute :: {-# UNPACK #-} !Minute
     , _tpSecond :: {-# UNPACK #-} !Int
     , _tpSecFrac :: {-# UNPACK #-} !NominalDiffTime
-    , _tpPOSIXTime :: {-# UNPACK #-} !POSIXTime
+    , _tpPOSIXTime :: {-# UNPACK #-} !NominalDiffTime
     , _tpTimeZone :: !TimeZone
     }
-
-makeLenses ''TimeParse
 
 flag :: TimeFlag -> Lens' TimeParse Bool
 flag (fromEnum -> f) = tpFlags . lens
@@ -766,7 +745,6 @@ tpYear tp = _tpCenturyYear tp + 100 * if tp ^. flag HasCentury
     then 20
     else 19
 {-# INLINE tpYear #-}
-
 
 -- | Time 'Parser' for UTF-8 encoded 'ByteString's.
 --
@@ -803,7 +781,10 @@ timeParser = flip execStateT unixEpoch . go
             'M' -> lift (dec0 2) >>= assign tpMinute >> go rspec
             -- Second
             'S' -> lift (dec0 2) >>= assign tpSecond >> go rspec
+
+            -- TODO: Unsupported by pact
             'q' -> lift micro >>= assign tpSecFrac . NominalDiffTime >> go rspec
+
             'v' -> lift micro >>= assign tpSecFrac . NominalDiffTime >> go rspec
             'Q' -> lift ((P.char '.' >> NominalDiffTime <$> micro) <|> return zeroV)
                 >>= assign tpSecFrac >> go rspec
@@ -848,7 +829,7 @@ timeParser = flip execStateT unixEpoch . go
             -- UTCTime
             's' -> do
                 s <- lift (negative P.decimal)
-                tpPOSIXTime .= fromTimestampMicros (1000000 * s)
+                tpPOSIXTime .= fromMicroseconds (1000000 * s)
                 flag IsPOSIXTime .= True
                 go rspec
 
@@ -936,13 +917,13 @@ timeParser = flip execStateT unixEpoch . go
         , _tpMinute = 0
         , _tpSecond = 0
         , _tpSecFrac = zeroV
-        , _tpPOSIXTime = posixEpoch
+        , _tpPOSIXTime = zeroV
         , _tpTimeZone = utc
         }
     {-# INLINE unixEpoch #-}
 {-# INLINEABLE timeParser #-}
 
-parseTime :: (ParseTime t) => String -> String -> Maybe t
+parseTime :: String -> String -> Maybe UTCTime
 parseTime spec = either (const Nothing) Just
     . P.parseOnly parser . utf8String
   where
@@ -1004,15 +985,15 @@ instance ParseTime MondayWeek where
         (if _tpDayOfWeek tp == 0 then 7 else _tpDayOfWeek tp)
     {-# INLINE buildTime #-}
 
-instance ParseTime Day where
+instance ParseTime ModifiedJulianDay where
     {-# INLINE buildTime #-}
     buildTime tp
-        | tp ^. flag IsOrdinalDate = ordinalDate # buildTime tp
-        | tp ^. flag IsGregorian = gregorian # buildTime tp
-        | tp ^. flag IsWeekDate = weekDate # buildTime tp
-        | tp ^. flag IsSundayWeek = sundayWeek # buildTime tp
-        | tp ^. flag IsMondayWeek = mondayWeek # buildTime tp
-        | otherwise = ordinalDate # buildTime tp
+        | tp ^. flag IsOrdinalDate = fromOrdinalDate $ buildTime tp
+        | tp ^. flag IsGregorian = toGregorian $ buildTime tp
+        | tp ^. flag IsWeekDate = fromWeekDate $ buildTime tp
+        | tp ^. flag IsSundayWeek = fromSundayWeek $ buildTime tp
+        | tp ^. flag IsMondayWeek = fromMondayWeek $ buildTime tp
+        | otherwise = fromOrdinalDate $ buildTime tp
         -- TODO: Better conflict handling when multiple flags are set?
 
 instance ParseTime TimeZone where
@@ -1021,10 +1002,10 @@ instance ParseTime TimeZone where
 
 instance ParseTime UTCTime where
     buildTime tp = if tp ^. flag IsPOSIXTime
-        then  fromPosixTimestampMicros $ toTimestampMicros $ _tpPOSIXTime tp
+        then  fromPosixTimestampMicros $ toMicroseconds $ _tpPOSIXTime tp
         else zoned
       where
-        d :: Day
+        d :: ModifiedJulianDay
         d = buildTime tp
 
         dt :: TimeOfDay
@@ -1033,18 +1014,17 @@ instance ParseTime UTCTime where
         tz :: TimeZone
         tz = buildTime tp
 
-        jul :: Julian
-        jul = Julian d (toDayTime dt)
+        jul :: ModifiedJulianDate
+        jul = ModifiedJulianDate d (toDayTime dt)
 
         zoned :: UTCTime
-        zoned = fromJulian jul .+^ timeZoneOffset tz
+        zoned = fromModifiedJulianDate jul .+^ timeZoneOffset tz
 
         toDayTime :: TimeOfDay -> NominalDiffTime
         toDayTime (TimeOfDay h m s) = s
             ^+^ fromIntegral m *^ NominalDiffTime 60000000
             ^+^ fromIntegral h *^ NominalDiffTime 3600000000
         {-# INLINEABLE toDayTime #-}
-
     {-# INLINE buildTime #-}
 
 -- -------------------------------------------------------------------------- --
@@ -1193,18 +1173,61 @@ instance FromJSON UTCTime where
     {-# INLINE parseJSON #-}
 
 -- -------------------------------------------------------------------------- --
--- TODO: Test instances:
+-- TimeParse Lenses
 
--- This may be different when the time package is used:
--- f = "%Y-%m-%dT%H:%M:%S%v%Z"
--- formatTime_ f t -> OK
--- parseTime_ f (formatTime_ f t) -> error
+tpCentury :: Lens' TimeParse Int
+tpCentury = lens _tpCentury (\a b -> a { _tpCentury = b })
+{-# INLINE tpCentury #-}
 
--- f = "%Y-%m-%dT%H:%M:%S.%v%Z"
--- formatTime_ f t -> OK
--- parseTime_ f (formatTime_ f t) -> OK
+tpCenturyYear :: Lens' TimeParse Int
+tpCenturyYear = lens _tpCenturyYear (\a b -> a { _tpCenturyYear = b })
+{-# INLINE tpCenturyYear #-}
 
--- f = "%Y-%m-%dT%H:%M:%S%Q%Z"
--- formatTime_ f t -> OK
--- parseTime_ f (formatTime_ f t) -> OK
+tpMonth :: Lens' TimeParse Int
+tpMonth = lens _tpMonth (\a b -> a { _tpMonth = b })
+{-# INLINE tpMonth #-}
+
+tpWeekOfYear :: Lens' TimeParse Int
+tpWeekOfYear = lens _tpWeekOfYear (\a b -> a { _tpWeekOfYear = b })
+{-# INLINE tpWeekOfYear #-}
+
+tpDayOfMonth :: Lens' TimeParse Int
+tpDayOfMonth = lens _tpDayOfMonth (\a b -> a { _tpDayOfMonth = b })
+{-# INLINE tpDayOfMonth #-}
+
+tpDayOfYear :: Lens' TimeParse Int
+tpDayOfYear = lens _tpDayOfYear (\a b -> a { _tpDayOfYear = b })
+{-# INLINE tpDayOfYear #-}
+
+tpDayOfWeek :: Lens' TimeParse Int
+tpDayOfWeek = lens _tpDayOfWeek (\a b -> a { _tpDayOfWeek = b })
+{-# INLINE tpDayOfWeek #-}
+
+tpFlags :: Lens' TimeParse Int
+tpFlags = lens _tpFlags (\a b -> a { _tpFlags = b })
+{-# INLINE tpFlags #-}
+
+tpHour :: Lens' TimeParse Int
+tpHour = lens _tpHour (\a b -> a { _tpHour = b })
+{-# INLINE tpHour #-}
+
+tpMinute :: Lens' TimeParse Int
+tpMinute = lens _tpMinute (\a b -> a { _tpMinute = b })
+{-# INLINE tpMinute #-}
+
+tpSecond :: Lens' TimeParse Int
+tpSecond = lens _tpSecond (\a b -> a { _tpSecond = b })
+{-# INLINE tpSecond #-}
+
+tpSecFrac :: Lens' TimeParse NominalDiffTime
+tpSecFrac = lens _tpSecFrac (\a b -> a { _tpSecFrac = b })
+{-# INLINE tpSecFrac #-}
+
+tpPOSIXTime :: Lens' TimeParse NominalDiffTime
+tpPOSIXTime = lens _tpPOSIXTime (\a b -> a { _tpPOSIXTime = b })
+{-# INLINE tpPOSIXTime #-}
+
+tpTimeZone :: Lens' TimeParse TimeZone
+tpTimeZone = lens _tpTimeZone (\a b -> a { _tpTimeZone = b })
+{-# INLINE tpTimeZone #-}
 
