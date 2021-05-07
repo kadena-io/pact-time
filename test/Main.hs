@@ -19,9 +19,9 @@ import Test.Tasty
 
 -- internal modules
 
-import qualified Test.Data.Time.Format (tests)
+import qualified Test.Pact.Time.Format (tests)
 
 main :: IO ()
 main = defaultMain $ testGroup "tests"
-    [ Test.Data.Time.Format.tests
+    [ Test.Pact.Time.Format.tests
     ]

@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 -- |
--- Module: Data.Time
+-- Module: Pact.Time
 -- Copyright: Copyright © 2021 Kadena LLC.
 -- License: MIT
 -- Maintainer: Lars Kuhtz <lars@kadena.io>
@@ -22,7 +22,7 @@
 -- Details about supported formats can be found in the [Pact Language
 -- Reference](https://pact-language.readthedocs.io/en/stable/pact-reference.html#time-formats).
 --
-module Data.Time
+module Pact.Time
 (
 -- * NominalDiffTime
   NominalDiffTime(..)
@@ -52,6 +52,6 @@ module Data.Time
 , VectorSpace(..)
 ) where
 
-import Data.Time.Format
-import Data.Time.Internal
+import Pact.Time.Format
+import Pact.Time.Internal
 

@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 -- |
--- Module: Data.Time.Internal
+-- Module: Pact.Time.Internal
 -- Copyright: Copyright © 2021 Kadena LLC.
 -- License: MIT
 -- Maintainer: Lars Kuhtz <lars@kadena.io>
@@ -17,7 +17,7 @@
 -- This is an internal module. No guarantee is provided regarding the stability
 -- of the functions in this module. Use at your own risk.
 --
-module Data.Time.Internal
+module Pact.Time.Internal
 (
   Micros
 , Day
@@ -67,7 +67,7 @@ import Lens.Micro
 
 -- internal modules
 
-import Data.Time.System
+import Pact.Time.System
 
 -- -------------------------------------------------------------------------- --
 -- Types for internal representations

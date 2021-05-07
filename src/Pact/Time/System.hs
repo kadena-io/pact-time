@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 -- |
--- Module: Data.Time.System
+-- Module: Pact.Time.System
 -- Copyright: Copyright © 2021 Kadena LLC.
 -- License: MIT
 -- Maintainer: Lars Kuhtz <lars@kadena.io>
@@ -10,7 +10,7 @@
 -- Returns the time of the system clock as 64-bit value that counts microseconds
 -- since the POSIX epoch.
 --
-module Data.Time.System
+module Pact.Time.System
 ( getSystemTimeMicros
 ) where
 

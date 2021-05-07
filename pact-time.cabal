@@ -1,6 +1,6 @@
 cabal-version: 2.4
 name: pact-time
-version: 0.1.0.0
+version: 0.2.0.0
 synopsis: Time Library for Pact
 Description:
     A minimal time library for usage with the [Pact Smart Contract
@@ -50,10 +50,10 @@ library
     ghc-options:
         -Wall
     exposed-modules:
-        Data.Time
-        Data.Time.Internal
-        Data.Time.Format
-        Data.Time.System
+        Pact.Time
+        Pact.Time.Internal
+        Pact.Time.Format
+        Pact.Time.System
     build-depends:
         -- external
         , Decimal >=0.4
@@ -70,13 +70,13 @@ library
 
   if flag(with-time)
     cpp-options: -DWITH_TIME=1
-    other-modules: Data.Time.Format.External
+    other-modules: Pact.Time.Format.External
     build-depends: time >= 1.8
   else
     cpp-options: -DWITH_TIME=0
     other-modules:
-        Data.Time.Format.Internal
-        Data.Time.Format.Locale
+        Pact.Time.Format.Internal
+        Pact.Time.Format.Locale
     build-depends:
         , clock >= 0.7.2
         , mtl >=2.2
@@ -92,7 +92,7 @@ test-suite tests
         -with-rtsopts=-N
     main-is: Main.hs
     other-modules:
-        Test.Data.Time.Format
+        Test.Pact.Time.Format
     build-depends:
         pact-time
 

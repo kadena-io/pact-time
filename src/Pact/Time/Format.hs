@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 -- |
--- Module: Data.Time.Format
+-- Module: Pact.Time.Format
 -- Copyright: Copyright © 2021 Kadena LLC.
 -- License: MIT
 -- Maintainer: Lars Kuhtz <lars@kadena.io>
@@ -9,7 +9,7 @@
 --
 -- TODO
 --
-module Data.Time.Format
+module Pact.Time.Format
 (
 -- * Formatting and Parsing
   parseTime
@@ -17,8 +17,8 @@ module Data.Time.Format
 ) where
 
 #if WITH_TIME
-import Data.Time.Format.External
+import Pact.Time.Format.External
 #else
-import Data.Time.Format.Internal
+import Pact.Time.Format.Internal
 #endif
 

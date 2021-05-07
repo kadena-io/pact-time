@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- |
--- Module: Data.Time.Format.Internal
+-- Module: Pact.Time.Format.Internal
 -- Copyright: Copyright © 2021 Kadena LLC.
 --                      © 2013−2014 Liyang HU Liyang HU
 -- License: MIT
@@ -19,7 +19,7 @@
 -- The code in this module is derived from various modules of the thyme package,
 -- which is copyright (c) 2013 Liyang HU and distributed under a BSD3 license.
 --
-module Data.Time.Format.Internal
+module Pact.Time.Format.Internal
 ( formatTime
 , parseTime
 , readTime
@@ -48,8 +48,8 @@ import Lens.Micro
 
 -- internal modules
 
-import Data.Time.Internal
-import Data.Time.Format.Locale
+import Pact.Time.Internal
+import Pact.Time.Format.Locale
 
 -- -------------------------------------------------------------------------- --
 -- Lens Utils (from microlens-mtl)

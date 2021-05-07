@@ -1,13 +1,12 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- |
--- Module: Data.Time.Format.External
+-- Module: Pact.Time.Format.External
 -- Copyright: Copyright © 2021 Kadena LLC.
 -- License: MIT
 -- Maintainer: Lars Kuhtz <lars@kadena.io>
@@ -15,7 +14,7 @@
 --
 -- TODO
 --
-module Data.Time.Format.External
+module Pact.Time.Format.External
 (
 -- * Formatting and Parsing
   parseTime
@@ -23,13 +22,13 @@ module Data.Time.Format.External
 ) where
 
 import Data.Aeson
-import qualified "time" Data.Time as T
+import qualified Data.Time as T
 
 import Text.Read (readPrec)
 
 -- internal modules
 
-import Data.Time.Internal
+import Pact.Time.Internal
 
 -- -------------------------------------------------------------------------- --
 -- Internal Utils

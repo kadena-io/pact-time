@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 -- |
--- Module: Data.Time.Format.Locale
+-- Module: Pact.Time.Format.Locale
 -- Description : Short description
 -- Copyright   : (c) Kadena LLC, 2021
 --                   Ashley Yakeley and contributors, 2004-2021
@@ -42,7 +42,7 @@
 -- POSSIBILITY OF SUCH DAMAGE.
 -- @
 --
-module Data.Time.Format.Locale
+module Pact.Time.Format.Locale
 ( TimeLocale(..)
 , defaultTimeLocale
 ) where

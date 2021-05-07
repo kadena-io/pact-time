@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
--- Module: Test.Data.Time.Format
+-- Module: Test.Pact.Time.Format
 -- Copyright: Copyright © 2021 Kadena LLC.
 -- License: MIT
 -- Maintainer: Lars Kuhtz <lars@kadena.io>
@@ -11,7 +11,7 @@
 --
 -- TODO
 --
-module Test.Data.Time.Format
+module Test.Pact.Time.Format
 ( tests
 , formats
 ) where
@@ -21,7 +21,7 @@ import Test.Tasty.HUnit
 
 -- internal modules
 
-import Data.Time
+import Pact.Time
 
 -- -------------------------------------------------------------------------- --
 -- TODO: Test instances:
@@ -43,7 +43,7 @@ import Data.Time
 -- Tests
 
 tests :: TestTree
-tests = testGroup "Test.Data.Time.Format"
+tests = testGroup "Test.Pact.Time.Format"
     [ testFormats posixEpochFormats
     , testFormats mjdEpochFormats
     , checkCase posixEpoch q
