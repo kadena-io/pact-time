@@ -13,9 +13,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ['9.0.1', '8.6.5', '8.8.4', '8.10.4']
+        ghc: ['9.0.1', '8.10.4', '8.8.4', '8.6.5']
         cabal: ['3.2.0.0']
         os: ['ubuntu-18.04', 'ubuntu-20.04', 'macOS-latest']
+        flags: [ '-with-time' ]
+        include:
+        - ghc: '9.0.1'
+          cabal: '3.2.0.0'
+          os: 'ubuntu-20.04'
+          flags: '+with-time'
+        - ghc: '8.6.5'
+          cabal: '3.2.0.0'
+          os: 'ubuntu-20.04'
+          flags: '+with-time'
 
     steps:
 
@@ -34,6 +44,7 @@ jobs:
           documentation: True
           benchmarks: True
           tests: True
+          flags: ${{ matrix.flags }}
         EOF
 
     # Restore Packages from Caches
@@ -45,7 +56,6 @@ jobs:
           ~/.cabal/store
           ./dist-newstyle
         key: ${{ matrix.os }}-${{ matrix.ghc }}
-        restore-keys: |
 
     # Build
     - name: Update package database
@@ -60,5 +70,5 @@ jobs:
       run: cabal v2-build
 
     # Tests
-    # - name: Run Tests
-    #   run: cabal v2-test
+    - name: Run Tests
+      run: cabal v2-test
