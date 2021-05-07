@@ -16,10 +16,10 @@
 -- ignores leap seconds.
 --
 -- While the library can parse date-time values with time zones, internally all
--- date-times are represented as UTC and formatting only supports UTC. Only
--- the default English language locale is supported.
+-- date-times are represented as UTC and formatting only supports UTC. Only the
+-- default English language locale is supported.
 --
--- Detail about supported formats can be found in the [Pact Language
+-- Details about supported formats can be found in the [Pact Language
 -- Reference](https://pact-language.readthedocs.io/en/stable/pact-reference.html#time-formats).
 --
 module Data.Time
