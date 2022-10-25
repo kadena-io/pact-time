@@ -13,17 +13,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ghc: ['9.0.1', '8.10.4', '8.8.4', '8.6.5']
-        cabal: ['3.2.0.0']
-        os: ['ubuntu-18.04', 'ubuntu-20.04', 'macOS-latest']
+        ghc: ['9.2.4', '9.0.2', '8.10.7', '8.8.4', '8.6.5']
+        cabal: ['3.8']
+        os: ['ubuntu-22.04', 'ubuntu-20.04', 'macOS-latest']
         flags: [ '-with-time' ]
         include:
-        - ghc: '9.0.1'
-          cabal: '3.2.0.0'
+        - ghc: '9.0.2'
+          cabal: '3.8'
           os: 'ubuntu-20.04'
           flags: '+with-time'
         - ghc: '8.6.5'
-          cabal: '3.2.0.0'
+          cabal: '3.8'
           os: 'ubuntu-20.04'
           flags: '+with-time'
 
@@ -33,7 +33,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
     - name: Install GHC and Cabal
-      uses: actions/setup-haskell@v1
+      uses: haskell/actions/setup@v2.0.1
       with:
          ghc-version: ${{ matrix.ghc }}
          cabal-version: ${{ matrix.cabal }}
@@ -59,16 +59,16 @@ jobs:
 
     # Build
     - name: Update package database
-      run: cabal v2-update
+      run: cabal update
     - name: Configure build
       run: |
-        cabal v2-build all --dry-run
-        cabal v2-freeze
+        cabal build all --dry-run
+        cabal freeze
     - name: Install build dependencies
-      run: cabal v2-build --only-dependencies
+      run: cabal build --only-dependencies
     - name: Build library
-      run: cabal v2-build
+      run: cabal build
 
     # Tests
     - name: Run Tests
-      run: cabal v2-test
+      run: cabal test

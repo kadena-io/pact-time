@@ -1,6 +1,6 @@
 cabal-version: 2.4
 name: pact-time
-version: 0.2.0.0
+version: 0.2.0.1
 synopsis: Time Library for Pact
 Description:
     A minimal time library for usage with the [Pact Smart Contract
@@ -27,8 +27,10 @@ maintainer: lakuhtz@gmail.com
 copyright: Copyright (c) 2021 Kadena LLC.
 category: Data, System
 tested-with:
-    GHC==9.0.1
-    GHC==8.10.4
+    GHC==9.4.2
+    GHC==9.2.4
+    GHC==9.0.2
+    GHC==8.10.7
     GHC==8.8.4
     GHC==8.6.5
 extra-source-files:
@@ -58,8 +60,8 @@ library
         -- external
         , Decimal >=0.4
         , aeson >=0.11
-        , attoparsec >= 0.13
-        , base >=4.11 && <4.16
+        , attoparsec >=0.13
+        , base >=4.11 && <5
         , bytestring >=0.10
         , cereal >=0.5
         , deepseq >=1.4
@@ -96,6 +98,6 @@ test-suite tests
     build-depends:
         pact-time
 
-        , base >=4.11 && <4.16
+        , base >=4.11 && <5
         , tasty >=1.4
         , tasty-hunit >=0.10

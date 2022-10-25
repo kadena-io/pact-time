@@ -1,5 +1,10 @@
 # Revision history for pact-time
 
+## 0.2.0.1 -- 2022-10-25
+
+*   Relax upper bound on base
+*   Support GHC versions 9.2 and 9.4
+
 ## 0.2.0.0 -- 2021-05-07
 
 *   Move all modules from `Data.Time` to `Pact.Time`.
