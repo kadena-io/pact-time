@@ -1,5 +1,9 @@
 # Revision history for pact-time
 
+## 0.2.0.2 -- 2023-05-11
+
+*   Support mtl-2.3
+
 ## 0.2.0.1 -- 2022-10-25
 
 *   Relax upper bound on base
