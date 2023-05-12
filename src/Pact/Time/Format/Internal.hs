@@ -280,7 +280,7 @@ data WeekDate = WeekDate
     }
 
 toWeekDate :: ModifiedJulianDay -> WeekDate
-toWeekDate = join (toWeekOrdinal . toOrdinalDate)
+toWeekDate d = toWeekOrdinal (toOrdinalDate d) d
 {-# INLINEABLE toWeekDate #-}
 
 fromWeekDate :: WeekDate -> ModifiedJulianDay
