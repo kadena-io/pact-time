@@ -48,6 +48,7 @@ flag with-time
     default: False
 
 library numeric
+    visibility: public
     hs-source-dirs: numeric/src
     default-language: Haskell2010
     ghc-options:
