@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: pact-time
-version: 0.2.0.2
+version: 0.3.0.0
 synopsis: Time Library for Pact
 Description:
     A minimal time library for usage with the [Pact Smart Contract
