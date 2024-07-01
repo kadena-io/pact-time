@@ -98,7 +98,6 @@ newtype NominalDiffTime = NominalDiffTime { _microseconds :: Micros }
     deriving newtype
         ( NFData
         , AdditiveSemigroup, AdditiveAbelianSemigroup, AdditiveMonoid, AdditiveGroup
-        -- , FractionalVectorSpace
         , Enum, Bounded
         )
 
