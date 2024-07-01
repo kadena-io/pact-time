@@ -42,7 +42,6 @@ import qualified Data.Text as T
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.Vector.Unboxed as VU
-import Data.VectorSpace
 
 import Lens.Micro
 
@@ -793,7 +792,7 @@ timeParser = flip execStateT unixEpoch . go
             'q' -> lift micro >>= assign tpSecFrac . NominalDiffTime >> go rspec
 
             'v' -> lift micro >>= assign tpSecFrac . NominalDiffTime >> go rspec
-            'Q' -> lift ((P.char '.' >> NominalDiffTime <$> micro) <|> return zeroV)
+            'Q' -> lift ((P.char '.' >> NominalDiffTime <$> micro) <|> return zero)
                 >>= assign tpSecFrac >> go rspec
 
             -- Year
@@ -923,8 +922,8 @@ timeParser = flip execStateT unixEpoch . go
         , _tpHour = 0
         , _tpMinute = 0
         , _tpSecond = 0
-        , _tpSecFrac = zeroV
-        , _tpPOSIXTime = zeroV
+        , _tpSecFrac = zero
+        , _tpPOSIXTime = zero
         , _tpTimeZone = utc
         }
     {-# INLINE unixEpoch #-}
@@ -1029,8 +1028,8 @@ instance ParseTime UTCTime where
 
         toDayTime :: TimeOfDay -> NominalDiffTime
         toDayTime (TimeOfDay h m s) = s
-            ^+^ fromIntegral m *^ NominalDiffTime 60000000
-            ^+^ fromIntegral h *^ NominalDiffTime 3600000000
+            ^+^ m *^ NominalDiffTime 60000000
+            ^+^ h *^ NominalDiffTime 3600000000
         {-# INLINEABLE toDayTime #-}
     {-# INLINE buildTime #-}
 

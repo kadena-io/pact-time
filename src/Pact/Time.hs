@@ -48,8 +48,16 @@ module Pact.Time
 , formatTime
 
 -- * Reexports
-, AffineSpace(..)
-, VectorSpace(..)
+, AdditiveSemigroup(..)
+, AdditiveMonoid(..)
+, AdditiveGroup(..)
+, (^-^)
+, (^+^)
+, (.+^)
+, (^+.)
+, (.-.)
+, (.-^)
+, (*^)
 ) where
 
 import Pact.Time.Format

@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- |
 -- Module: Pact.Time.Internal
@@ -29,6 +30,8 @@ module Pact.Time.Internal
 , toSeconds
 , fromSeconds
 , nominalDay
+, scaleNominalDiffTime
+, divNominalDiffTime
 
 -- * UTCTime
 , UTCTime(..)
@@ -48,17 +51,23 @@ module Pact.Time.Internal
 , fromModifiedJulianDate
 
 -- * Reexports
-, AffineSpace(..)
-, VectorSpace(..)
+, AdditiveSemigroup(..)
+, AdditiveMonoid(..)
+, AdditiveGroup(..)
+, (^-^)
+, (^+^)
+, (.+^)
+, (^+.)
+, (.-.)
+, (.-^)
+, (*^)
 ) where
 
 import Control.DeepSeq
 
-import Data.AdditiveGroup
-import Data.AffineSpace
 import Data.Decimal
 import Data.Serialize
-import Data.VectorSpace
+-- import Data.VectorSpace
 
 import GHC.Generics hiding (from)
 import GHC.Int (Int64)
@@ -68,6 +77,9 @@ import Lens.Micro
 -- internal modules
 
 import Pact.Time.System
+
+import Numeric.Additive
+import Numeric.AffineSpace
 
 -- -------------------------------------------------------------------------- --
 -- Types for internal representations
@@ -83,7 +95,11 @@ type Day = Int
 --
 newtype NominalDiffTime = NominalDiffTime { _microseconds :: Micros }
     deriving (Eq, Ord)
-    deriving newtype (NFData)
+    deriving newtype
+        ( NFData
+        , AdditiveSemigroup, AdditiveAbelianSemigroup, AdditiveMonoid, AdditiveGroup
+        , Enum, Bounded
+        )
 
 -- | Convert from 'NominalDiffTime' to a 64-bit representation of microseconds.
 --
@@ -96,21 +112,6 @@ toMicroseconds = _microseconds
 fromMicroseconds :: Micros -> NominalDiffTime
 fromMicroseconds = NominalDiffTime
 {-# INLINE fromMicroseconds #-}
-
-instance AdditiveGroup NominalDiffTime where
-    zeroV = NominalDiffTime 0
-    NominalDiffTime a ^+^ NominalDiffTime b = NominalDiffTime (a + b)
-    negateV (NominalDiffTime v) = NominalDiffTime (-v)
-    NominalDiffTime a ^-^ NominalDiffTime b = NominalDiffTime (a - b)
-    {-# INLINE zeroV #-}
-    {-# INLINE (^+^) #-}
-    {-# INLINE negateV #-}
-    {-# INLINE (^-^) #-}
-
-instance VectorSpace NominalDiffTime where
-    type Scalar NominalDiffTime = Rational
-    s *^ (NominalDiffTime m) = NominalDiffTime $ round (s * fromIntegral m)
-    {-# INLINE (*^) #-}
 
 -- | Serializes 'NominalDiffTime' as 64-bit signed microseconds in little endian
 -- encoding.
@@ -150,6 +151,18 @@ fromPosixTimestampMicros :: Micros -> UTCTime
 fromPosixTimestampMicros = fromPosix . fromTimestampMicros
 {-# INLINE fromPosixTimestampMicros #-}
 
+scaleNominalDiffTime :: Integral a => a -> NominalDiffTime -> NominalDiffTime
+scaleNominalDiffTime scalar (NominalDiffTime t) = NominalDiffTime (fromIntegral scalar * t)
+{-# INLINE scaleNominalDiffTime #-}
+
+(*^) :: Integral a => a -> NominalDiffTime -> NominalDiffTime
+(*^) = scaleNominalDiffTime
+{-# INLINE (*^) #-}
+
+divNominalDiffTime :: Integral a => NominalDiffTime -> a -> NominalDiffTime
+divNominalDiffTime (NominalDiffTime a) s = NominalDiffTime $ a `div` (fromIntegral s)
+{-# INLINE divNominalDiffTime #-}
+
 -- -------------------------------------------------------------------------- --
 -- UTCTime
 
@@ -167,12 +180,12 @@ newtype UTCTime = UTCTime { _utcTime :: NominalDiffTime }
     deriving newtype (NFData)
     deriving newtype (Serialize)
 
-instance AffineSpace UTCTime where
+instance LeftTorsor UTCTime where
     type Diff UTCTime = NominalDiffTime
-    UTCTime a .-. UTCTime b = a ^-^ b
-    UTCTime a .+^ b = UTCTime (a ^+^ b)
-    {-# INLINE (.-.) #-}
-    {-# INLINE (.+^) #-}
+    add s (UTCTime t) = UTCTime (s `plus` t)
+    diff (UTCTime t₁) (UTCTime t₂) = t₁ `minus` t₂
+    {-# INLINE add #-}
+    {-# INLINE diff #-}
 
 getCurrentTime :: IO UTCTime
 getCurrentTime = UTCTime . (^+^ _utcTime posixEpoch) . _posixTime
@@ -210,7 +223,7 @@ fromDayAndDayTime d t = fromModifiedJulianDate $ ModifiedJulianDate d t
 -- | The POSIX Epoch represented as UTCTime.
 --
 posixEpoch :: UTCTime
-posixEpoch = UTCTime (fromIntegral d *^ nominalDay)
+posixEpoch = UTCTime (d *^ nominalDay)
   where
     ModifiedJulianDay d = posixEpochDay
 {-# INLINE posixEpoch #-}
@@ -218,7 +231,7 @@ posixEpoch = UTCTime (fromIntegral d *^ nominalDay)
 -- | The Epoch of the modified Julian day represented as 'UTCTime'.
 --
 mjdEpoch :: UTCTime
-mjdEpoch = UTCTime zeroV
+mjdEpoch = UTCTime zero
 {-# INLINE mjdEpoch #-}
 
 -- -------------------------------------------------------------------------- --
@@ -311,6 +324,6 @@ toModifiedJulianDate (UTCTime (NominalDiffTime m)) = ModifiedJulianDate
 --
 fromModifiedJulianDate :: ModifiedJulianDate -> UTCTime
 fromModifiedJulianDate (ModifiedJulianDate (ModifiedJulianDay d) t)
-    = UTCTime $ (fromIntegral d *^ nominalDay) ^+^ t
+    = UTCTime $ (d *^ nominalDay) ^+^ t
 {-# INLINE fromModifiedJulianDate #-}
 
