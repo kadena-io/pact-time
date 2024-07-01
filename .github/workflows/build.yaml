@@ -52,16 +52,6 @@ jobs:
         cabal build all --dry-run
         cabal freeze
 
-    # Restore Packages from Caches
-    - uses: actions/cache@v3
-      name: cache cabal store
-      with:
-        path: |
-          ~/.cabal/packages
-          ~/.cabal/store
-          ./dist-newstyle
-        key: ${{ matrix.os }}-${{ matrix.ghc }}
-
     - name: Restore cached dependencies
       uses: actions/cache/restore@v4
       id: cache
