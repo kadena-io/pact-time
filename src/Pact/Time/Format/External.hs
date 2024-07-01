@@ -49,7 +49,7 @@ fromUtcTime (T.UTCTime (T.ModifiedJulianDay d) t) = fromModifiedJulianDate
 -- | Parse a 'UTCTime' using the supplied format string.
 --
 -- Please refer to the [Pact Language
--- Reference](https://pact-language.readthedocs.io/en/stable/pact-reference.html#time-formats) for details on the
+-- Reference](https://docs.kadena.io/reference/functions/time) for details on the
 -- supported format strings.
 --
 #if MIN_VERSION_time(1,9,0)
@@ -63,7 +63,7 @@ parseTime format = fmap fromUtcTime . parseTime_ T.defaultTimeLocale format
 -- | Format a 'UTCTime' value using the supplied format string.
 --
 -- Please refer to the [Pact Language
--- Reference](https://pact-language.readthedocs.io/en/stable/pact-reference.html#time-formats) for details on the
+-- Reference](https://docs.kadena.io/reference/functions/time) for details on the
 -- supported format strings.
 --
 formatTime :: String -> UTCTime -> String

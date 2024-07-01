@@ -20,7 +20,7 @@
 -- default English language locale is supported.
 --
 -- Details about supported formats can be found in the [Pact Language
--- Reference](https://pact-language.readthedocs.io/en/stable/pact-reference.html#time-formats).
+-- Reference](https://docs.kadena.io/reference/functions/time).
 --
 module Pact.Time
 (

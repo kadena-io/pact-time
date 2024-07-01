@@ -168,7 +168,7 @@ mjdEpochFormats = Cases mjdEpoch
     , ("46", "%W", "week of year where weeks start on Monday, 0-padded to two chars, \"00\"–\"53\"")
     ]
 
--- | https://pact-language.readthedocs.io/en/stable/pact-reference.html#time-formats
+-- | https://docs.kadena.io/reference/functions/time#time-formatsh717561948
 --
 -- Can be used as a tempalte to define new test cases
 --

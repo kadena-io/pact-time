@@ -1,5 +1,9 @@
 # Revision history for pact-time
 
+## 0.3.0.1 -- 2024-07-01
+
+*   Update documentation links to the Pact language specification.
+
 ## 0.3.0.0 -- 2024-06-30
 
 Breaking changes:
